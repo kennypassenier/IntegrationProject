@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="add_invoice">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="uuid" type="xs:string"/>
+                <xs:element name="name" type="xs:string"/>
+                <xs:element name="description" type="xs:string"/>
+                <xs:element name="quantity" type="xs:string"/>
+                <xs:element name="price" type="xs:string"/>
+                <xs:element name="paid" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>

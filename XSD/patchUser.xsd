@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="patch_user">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="name" type="xs:string"/>
+                <xs:element name="uuid" type="xs:string"/>
+                <xs:element name="email" type="xs:string"/>
+                <xs:element name="street" type="xs:string"/>
+                <xs:element name="municipal" type="xs:string"/>
+                <xs:element name="postalCode" type="xs:string"/>
+                <xs:element name="vat" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>
