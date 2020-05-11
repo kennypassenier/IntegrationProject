@@ -3,12 +3,21 @@
     <xs:element name="add_invoice">
         <xs:complexType>
             <xs:sequence>
+                <xs:element name="application_name" type="xs:string"/>
                 <xs:element name="uuid" type="xs:string"/>
-                <xs:element name="name" type="xs:string"/>
-                <xs:element name="description" type="xs:string"/>
-                <xs:element name="quantity" type="xs:string"/>
-                <xs:element name="price" type="xs:string"/>
+                <xs:element name="event_id" type="xs:string"/>
                 <xs:element name="paid" type="xs:string"/>
+                <xs:element name="invoice_date" type="xs:string"/>  
+                <xs:element name="order_line" maxOccurs="unbounded">
+                  <xs:complexType>
+                    <xs:sequence>
+                      <xs:element name="name" type="xs:string"/>
+                      <xs:element name="quantity" type="xs:string"/>
+                      <xs:element name="price" type="xs:string"/>
+                      <xs:element name="discount" type="xs:string"/>
+                    </xs:sequence>
+                  </xs:complexType>
+                </xs:element>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

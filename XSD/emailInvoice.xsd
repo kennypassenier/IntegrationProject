@@ -1,15 +1,10 @@
 <?xml version="1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-    <xs:element name="update_invoice">
+    <xs:element name="error">
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="application_name" type="xs:string"/>
                 <xs:element name="invoice_id" type="xs:string"/>
-                <xs:element name="name" type="xs:string"/>
-                <xs:element name="description" type="xs:string"/>
-                <xs:element name="quantity" type="xs:string"/>
-                <xs:element name="price" type="xs:string"/>
-                <xs:element name="paid" type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

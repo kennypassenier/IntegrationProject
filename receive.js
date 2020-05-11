@@ -8,18 +8,21 @@ const amqp = require('amqplib/callback_api');
 const axios = require("axios").default;
 const fs = require("fs");
 const libxmljs = require("libxmljs");
+const xmlParser = require("xml2json");
 //const assert = require("assert");
 
 // Load XSD files
 const addUserFile = fs.readFileSync("./XSD/addUser.xsd");
 const patchUserFile = fs.readFileSync("./XSD/patchUser.xsd");
 const addInvoiceFile = fs.readFileSync("./XSD/addInvoice.xsd");
+// Todo update invoice mss niet nodig
 const updateInvoiceFile = fs.readFileSync("./XSD/updateInvoice.xsd");
 
 // Parse the files into xml
 const addUserDoc = libxmljs.parseXml(addUserFile);
 const patchUserDoc = libxmljs.parseXml(patchUserFile);
 const addInvoiceDoc = libxmljs.parseXml(addInvoiceFile);
+// Todo update invoice mss niet nodig
 const updateInvoiceDoc = libxmljs.parseXml(updateInvoiceFile);
 
 
@@ -27,12 +30,14 @@ const updateInvoiceDoc = libxmljs.parseXml(updateInvoiceFile);
 // Connect to the service
 amqp.connect('amqp://facturatie_user:facturatie_pwd@10.3.50.9', function(error0, connection) {
     if(error0){
-        console.error(error0);
+        console.log("Connection error");
+        console.log(error0);
         throw error0;
     }
     // Connect to the right channel
     connection.createChannel(function(error1, channel){
         if(error1){
+            console.log("Create channel error");
             console.error(error1);
         }
         // Declare the queue you want to listen to
@@ -44,20 +49,18 @@ amqp.connect('amqp://facturatie_user:facturatie_pwd@10.3.50.9', function(error0,
 
         console.log(`Waiting for messages in ${queue}. Exit with CTR+C`);
 
-        //newINUser("c900beb2-63bb-488d-ab6d-93e8540c078b", "Erik1", "erik@a.be", "Erikstraat", "Erikstad", "1111", "1234567890");
-
         channel.consume(queue, function(msg) {
-            console.log(" [x] Received %s", msg.content.toString());
-            let allowRemovaFromQueue = true;
+            console.log(`Received message:  ${msg.content.toString()}`);
+            let allowRemoveFromQueue = false;
 
             try{
                 let messageXML = libxmljs.parseXmlString(msg.content);
-                handleCases(messageXML);
+                handleCases(messageXML, channel);
             }
             catch(e){
-                console.log("Unable to parse XML");
-                console.log(e);
-                allowRemovaFromQueue = false;
+                console.log("Unable to handle message");
+                allowRemoveFromQueue = true;
+                sendError(channel, e.toString());
             }
 
 
@@ -65,7 +68,9 @@ amqp.connect('amqp://facturatie_user:facturatie_pwd@10.3.50.9', function(error0,
             // Error handling if needed
 
             // If everything went well, acknowledge the message to remove it from the queue
-            if(allowRemovaFromQueue){
+            console.log(`Ready to Ack ${msg.content.toString()}`);
+            if(allowRemoveFromQueue){
+                console.log("Acknowledging the message.");
                 //channel.ack(msg);
             }
 
@@ -77,7 +82,7 @@ amqp.connect('amqp://facturatie_user:facturatie_pwd@10.3.50.9', function(error0,
     });
 });
 
-function handleCases(messageXML){
+async function handleCases(messageXML, channel){
     // Check what kind of event is being sent
     // Which we can determine by checking the name of the root element
 
@@ -87,10 +92,21 @@ function handleCases(messageXML){
             // Validation
             if(messageXML.validate(addUserDoc)){
                 // Valid XML
-                //newINUser();
+                // Extract all the data from the XML message
+                //uuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat
+                let uuid = messageXML.get("//uuid").text();
+                let name = messageXML.get("//name").text();
+                let email = messageXML.get("//email").text();
+                let street = messageXML.get("//street").text();
+                let municipal = messageXML.get("//municipal").text();
+                let postalCode = messageXML.get("//postalCode").text();
+                let vat = messageXML.get("//vat").text();
+                newINUser(uuid, name, email, street, municipal, postalCode, vat);
+
             }
             else{
                 // Invalid XML
+                sendError(channel, "XML for new user could not be validated");
             }
             break;
         case "patch_user":
@@ -98,10 +114,20 @@ function handleCases(messageXML){
             // Validation
             if(messageXML.validate(patchUserDoc)){
                 // Valid XML
-                //updateINUser();
+                // Extract all the data from the XML message
+                let uuid = messageXML.get("//uuid").text();
+                let name = messageXML.get("//name").text();
+                let email = messageXML.get("//email").text();
+                let street = messageXML.get("//street").text();
+                let municipal = messageXML.get("//municipal").text();
+                let postalCode = messageXML.get("//postalCode").text();
+                let vat = messageXML.get("//vat").text();
+                updateINUser(uuid, name, email, street, municipal, postalCode, vat);
+
             }
             else{
                 // Invalid XML
+                sendError(channel, "XML to patch user could not be validated");
             }
 
 
@@ -113,9 +139,22 @@ function handleCases(messageXML){
             // Validation
             if(messageXML.validate(addInvoiceDoc)){
                 // Valid XML
+
+                let result = JSON.parse(xmlParser.toJson(messageXML.toString()));
+                console.log(" ");
+
+                console.log(result);
+                console.log(result.add_invoice);
+
+
+
+
+
+
             }
             else{
                 // Invalid XML
+                sendError(channel, "XML to create invoice could not be validated");
             }
             break;
         case "update_invoice":
@@ -126,57 +165,69 @@ function handleCases(messageXML){
             }
             else{
                 // Invalid XML
+                sendError(channel, "XML to update invoice could not be validated");
             }
             break;
         default:
-            console.log("An error must have occured");
+            sendError(channel, "Unknown case");
 
     }
 }
 
-function newINUser(uuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat){
+async function newINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat){
 
     console.log("Posting the following data to invoiceninja: ");
-    console.log(pName, pEmail, pMunicipal, pStreet, pPostalCode, pVat);
+    console.log(pUuid, pName, pEmail, pMunicipal, pStreet, pPostalCode, pVat);
 
-    axios.post("http://localhost/projects/ninja/public/api/v1/clients", {
-        name: pName,
-        address1: pStreet,
-        postal_code: pPostalCode,
-        city: pMunicipal,
-        vat_number: pVat,
-        contact:{
-           last_name: pName,
-            email: pEmail
+    // Post to IN
+    try{
+        let newClientResponse = await INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail);
+        let appId = newClientResponse.data.data.id;
+        console.log(`Patching user in masterUUID with uuid: ${pUuid} and appId: ${appId}`);
+        // Patch Master UUID
+        try{
+            await patchUserUUID(pUuid, appId);
+            console.log("patchUserUUID succesfull")
         }
-
-    }, {
-        headers: {
-            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        catch(error){
+            console.log("patchUserUUID failure")
         }
-    }).then(function(response){
-        console.log("Success, new user has been added to invoiceninja");
-        console.log(response.data);
-        console.log(`Application id: ${response.data.data.id}`);
+    }
+    catch(error){
+        console.log("Error when posting new client to IN");
+    }
 
-        let appId = response.data.data.id;
-
-        console.log(`Patching user with uuid: ${uuid} and appId: ${appId}`);
-        patchUserUUID(uuid, appId);
-
-    }).catch(function(error){
-        console.log("Failure to add user to invoiceninja");
-        console.log(error)
-    });
 }
 
-function updateINUser(uuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat){
+async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat){
+    console.log("Updating IN user");
+    try{
+        let appIdResponse = await getAppIdFromUuid(pUuid);
+        let appId = appIdResponse.data.facturatie;
+        console.log(`AppId: ${appId}`);
+        try{
+            let updateClientResponse = await INPatchClient(appId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail);
+            // todo send message to log exchange
+
+        }
+        catch(error){
+            //console.log(error);
+            console.log("Failure to patch IN user");
+        }
+    }
+    catch(error){
+        console.log("Error when getting app id from uuid");
+        //console.log(error);
+    }
+
+
+
 
 }
 
 /*function patchUserUUID(uuid, applicationId){
     let settings = {
-        "url": `http://10.3.50.9/uuids/${uuid}`,
+        "url": `http://10.3.50.9/uuid-master/uuids/${uuid}`,
         "method": "PATCH",
         "timeout": 0,
         "headers": {
@@ -190,16 +241,60 @@ function updateINUser(uuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVa
         console.log(response);
     });
 }*/
-function patchUserUUID(uuid, applicationId){
-    axios.patch(`http://10.3.50.9/uuids/${uuid}`,
+async function patchUserUUID(pUuid, applicationId){
+    console.log("Start patchUserUuid");
+    return await axios.patch(`http://10.3.50.9/uuid-master/uuids/${pUuid}`,
         {"facturatie":`${applicationId}`}
-    ).then(function(response){
-        console.log("Successfully patched UUID");
-        console.log(response);
-    }).catch(function(error){
-        console.log("Failure to patch UUID");
-        console.log(error)
+    );
+}
+
+async function getAppIdFromUuid(pUuid) {
+    console.log("start getAppIdFromUuid");
+    return await axios.get(`http://10.3.50.9/uuid-master/uuids/${pUuid}`);
+
+}
+async function INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail){
+    return await axios.post("http://localhost/projects/ninja/public/api/v1/clients", {
+        name: pName,
+        address1: pStreet,
+        postal_code: pPostalCode,
+        city: pMunicipal,
+        vat_number: pVat,
+        contact:{
+            last_name: pName,
+            email: pEmail
+        }
+
+    }, {
+        headers: {
+            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        }
     });
 }
 
+async function INPatchClient(pAppId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail){
+    return await axios.put(`http://localhost/projects/ninja/public/api/v1/clients/${pAppId}`, {
+        name: pName,
+        address1: pStreet,
+        postal_code: pPostalCode,
+        city: pMunicipal,
+        vat_number: pVat,
+        contact:{
+            last_name: pName,
+            email: pEmail
+        }
 
+    }, {
+        headers: {
+            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        }
+    });
+}
+function sendError(channel, message){
+    let errQueue = "errors.exchange";
+    channel.assertQueue(errQueue, {
+        durable:false
+    });
+    channel.sendToQueue(errQueue, Buffer.from(message));
+    console.log(`${message} sent to ${errQueue}`);
+}
