@@ -25,6 +25,9 @@ const addInvoiceDoc = libxmljs.parseXml(addInvoiceFile);
 // Todo update invoice mss niet nodig
 const updateInvoiceDoc = libxmljs.parseXml(updateInvoiceFile);
 
+// Global variables
+let currentChannel;
+
 
 //10.3.50.9
 // Connect to the service
@@ -50,6 +53,14 @@ amqp.connect('amqp://facturatie_user:facturatie_pwd@10.3.50.9', function(error0,
         console.log(`Waiting for messages in ${queue}. Exit with CTR+C`);
 
         channel.consume(queue, function(msg) {
+            currentChannel = channel;
+
+            // Todo testing sendMessage
+            sendMessage("errorMessage", true);
+            sendMessage("logMessage", false);
+
+
+
             console.log(`Received message:  ${msg.content.toString()}`);
             let allowRemoveFromQueue = false;
 
@@ -60,7 +71,7 @@ amqp.connect('amqp://facturatie_user:facturatie_pwd@10.3.50.9', function(error0,
             catch(e){
                 console.log("Unable to handle message");
                 allowRemoveFromQueue = true;
-                sendError(channel, e.toString());
+                sendMessage(e.toString(), true);
             }
 
 
@@ -106,7 +117,7 @@ async function handleCases(messageXML, channel){
             }
             else{
                 // Invalid XML
-                sendError(channel, "XML for new user could not be validated");
+                sendMessage("XML for new user could not be validated", true);
             }
             break;
         case "patch_user":
@@ -127,7 +138,7 @@ async function handleCases(messageXML, channel){
             }
             else{
                 // Invalid XML
-                sendError(channel, "XML to patch user could not be validated");
+                sendMessage( "XML to patch user could not be validated", true);
             }
 
 
@@ -140,39 +151,95 @@ async function handleCases(messageXML, channel){
             if(messageXML.validate(addInvoiceDoc)){
                 // Valid XML
 
-                let result = JSON.parse(xmlParser.toJson(messageXML.toString()));
-                console.log(" ");
-
-                console.log(result);
-                console.log(result.add_invoice);
-
-
-
-
-
+                let messageJson = JSON.parse(xmlParser.toJson(messageXML.toString()));
+                console.table(messageJson);
+                await addInvoice(messageJson);
 
             }
             else{
                 // Invalid XML
-                sendError(channel, "XML to create invoice could not be validated");
+                sendMessage( "XML to create invoice could not be validated", true);
             }
             break;
-        case "update_invoice":
-            console.log("Updating an existing invoice");
-            // Validation
-            if(messageXML.validate(updateInvoiceDoc)){
-                // Valid XML
-            }
-            else{
-                // Invalid XML
-                sendError(channel, "XML to update invoice could not be validated");
-            }
-            break;
+        case "send_email":
+            console.log("Sending invoice by email");
+            // validation
+            // todo validation
+            // await INSendInvoiceMail("uuid");
         default:
-            sendError(channel, "Unknown case");
+            sendMessage( "Unknown case", true);
 
     }
 }
+
+async function addInvoice(invoiceModel){
+
+    try{
+        let appIdResponse = await getAppIdFromUuid("e203909d-6a4f-4efd-9901-8bac4b6a9ec7");
+        let appId = appIdResponse.data.facturatie;
+        console.log(`AppId: ${appId}`);
+        try{
+            // Determine if we have to create a new invoice, or update one that exists already
+
+            let clientResponse = await INGetClient(123);
+            let client = clientResponse.data.data;
+
+            //console.log("Client: ");
+            //console.log(client);
+            let invoicesExist = client.invoices.length > 0 ? true : false;
+
+            if(invoicesExist){
+                // Update invoice
+                let invoiceNumber = client.invoices[0].id;
+
+                try{
+                    let updateResponse = await INPatchInvoice(invoiceNumber, invoiceModel);
+                    console.log("Update Response: ");
+                    console.log(updateResponse);
+
+                }
+                catch(error){
+                    console.log("Failed to update invoice");
+                }
+
+            }
+            else{
+                // Create new invoice
+
+                try {
+                    let updateResponse = await INPostNewInvoice(client.id, invoiceModel);
+                    console.log(updateResponse);
+                    console.log("Update Response: ");
+                    console.log(updateResponse);
+                }
+                catch(error){
+                    //console.log(error);
+                    console.log("Failed to create invoice");
+                }
+
+
+            }
+
+
+
+
+            // todo send message to log exchange
+
+        }
+        catch(error){
+            console.log(error);
+            console.log("Failure to add or update invoice");
+        }
+    }
+    catch(error){
+        console.log("Error when getting app id from uuid");
+        //console.log(error);
+    }
+
+}
+
+
+
 
 async function newINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat){
 
@@ -211,7 +278,7 @@ async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCo
 
         }
         catch(error){
-            //console.log(error);
+            console.log(error);
             console.log("Failure to patch IN user");
         }
     }
@@ -225,22 +292,6 @@ async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCo
 
 }
 
-/*function patchUserUUID(uuid, applicationId){
-    let settings = {
-        "url": `http://10.3.50.9/uuid-master/uuids/${uuid}`,
-        "method": "PATCH",
-        "timeout": 0,
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "data": JSON.stringify({"facturatie":`${applicationId}`}),
-    };
-
-    $.ajax(settings).done(function (response) {
-        console.log("User should be have been patched");
-        console.log(response);
-    });
-}*/
 async function patchUserUUID(pUuid, applicationId){
     console.log("Start patchUserUuid");
     return await axios.patch(`http://10.3.50.9/uuid-master/uuids/${pUuid}`,
@@ -253,6 +304,7 @@ async function getAppIdFromUuid(pUuid) {
     return await axios.get(`http://10.3.50.9/uuid-master/uuids/${pUuid}`);
 
 }
+
 async function INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail){
     return await axios.post("http://localhost/projects/ninja/public/api/v1/clients", {
         name: pName,
@@ -290,11 +342,173 @@ async function INPatchClient(pAppId, pName, pStreet, pPostalCode, pMunicipal, pV
         }
     });
 }
-function sendError(channel, message){
-    let errQueue = "errors.exchange";
-    channel.assertQueue(errQueue, {
+
+async function INGetClient(pAppId){
+    return await axios.get(`http://localhost/projects/ninja/public/api/v1/clients/${pAppId}?include=invoices`, {
+        headers: {
+            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        }
+    });
+}
+
+async function INSendMail(invoiceId){
+    return await axios.post(`http://localhost/projects/ninja/public/api/v1/email_invoice`, {
+        "id": `${invoiceId}`,
+    },{
+        headers: {
+            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        }
+    });
+}
+
+async function INGetInvoice(invoiceId){
+    return await axios.get(`http://localhost/projects/ninja/public/api/v1/invoices/${invoiceId}`, {
+        headers: {
+            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        }
+    });
+}
+
+async function INPostNewInvoice(clientId, invoiceModel){
+    // create the object
+    let payload = {
+        "client_id": `${clientId}`,
+        "invoice_items": [],
+        "paid": parseFloat(invoiceModel.add_invoice.paid),
+    }
+
+    // Enter new items
+    payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, payload.invoice_items);
+
+    console.log("payload: ");
+    console.log(payload);
+    console.table(payload);
+    console.log(invoiceModel);
+
+    return await axios.post("http://localhost/projects/ninja/public/api/v1/invoices",
+        payload,
+        {
+            headers: {
+                "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+            }
+        }
+    );
+}
+
+async function INPatchInvoice(invoiceNumber, invoiceModel){
+    // create the object
+    let payload = {
+        "invoice_items": [],
+        "paid": parseFloat(invoiceModel.add_invoice.paid),
+    }
+
+    // Get original invoice data
+    let originalInvoice = await INGetInvoice(invoiceNumber);
+    console.log("original invoice: ");
+    console.log(originalInvoice);
+    console.log("data1");
+    console.log(originalInvoice.data);
+    console.log("data2");
+    console.log(originalInvoice.data.data);
+
+    // Add old items back to the invoice
+    for(let line of originalInvoice.data.data.invoice_items){
+        console.log("Old line: ");
+        console.log(line);
+        payload.invoice_items.push(
+            {
+                "product_key": line.product_key,
+                "notes": line.notes,
+                "cost": line.cost,
+                "qty": line.qty,
+            }
+        );
+    }
+
+
+    // Enter new items
+    payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, payload.invoice_items);
+
+    console.log("payload: ");
+    console.log(payload);
+    console.table(payload);
+    console.log(invoiceModel);
+
+    return await axios.put(`http://localhost/projects/ninja/public/api/v1/invoices/${invoiceNumber}`,
+        payload,
+        {
+            headers: {
+                "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+            }
+        }
+    )
+}
+
+function createInvoicePayload(orderLines, existingItems){
+    let result = existingItems.length > 0 ? existingItems : [];
+
+    for(let line of orderLines){
+        console.log("New line");
+        console.log(line);
+        result.push(
+            {
+                "product_key": line.name,
+                "notes": line.discount,
+                "cost": line.price,
+                "qty": line.quantity,
+            }
+        );
+    }
+    return result;
+}
+
+async function INSendInvoiceMail(uuid){
+    try{
+        let appIdResponse = await getAppIdFromUuid(`${uuid}`);
+        let appId = appIdResponse.data.facturatie;
+        console.log(`AppId: ${appId}`);
+
+        try{
+            // Get user and his invoices
+            let clientWithInvoice = await INGetClient(appId);
+            console.log(clientWithInvoice);
+            let invoiceId = clientWithInvoice.data.data.invoices[0].id;
+            console.log("Invoice id: ");
+            console.log(invoiceId);
+            try{
+                let response = await INSendMail(invoiceId);
+                console.log(response.data);
+            }
+            catch(error){
+                console.log("Couldn't send email");
+            }
+
+        }
+        catch(error){
+            console.log("error retrieving client to send an email to");
+        }
+
+
+    }
+    catch(error) {
+        console.log("Error when getting app id from uuid");
+        //console.log(error);
+    }
+}
+
+function sendMessage(message, isError){
+    let messageType = !isError ? "log" : "error";
+    let enhancedMessage = `<?xml version="1.0" encoding="utf-8"?>
+            <${messageType}>
+                <application_name>facturatie</application_name>
+                <timestamp>${new Date().toISOString()}</timestamp>
+                <message>${message}</message>
+            </${messageType}>`;
+    let queueName = `${messageType}s.exchange`;
+
+    currentChannel.assertQueue(queueName, {
         durable:false
     });
-    channel.sendToQueue(errQueue, Buffer.from(message));
-    console.log(`${message} sent to ${errQueue}`);
+    currentChannel.sendToQueue(queueName, Buffer.from(enhancedMessage));
+    console.log(`${enhancedMessage} sent to ${queueName}`);
 }

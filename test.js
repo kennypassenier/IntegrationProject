@@ -68,6 +68,9 @@ async function startTest(){
     console.table(messageJson);
     await addInvoice(messageJson);
 
+    // Email invoice
+    await INSendInvoiceMail("e203909d-6a4f-4efd-9901-8bac4b6a9ec7");
+
 
 
 }
@@ -87,10 +90,10 @@ async function addInvoice(invoiceModel){
         try{
             // Determine if we have to create a new invoice, or update one that exists already
 
-            let clientResponse = await INGetClient(121);
+            let clientResponse = await INGetClient(123);
             let client = clientResponse.data.data;
 
-            console.log("Client: ");
+            //console.log("Client: ");
             //console.log(client);
             let invoicesExist = client.invoices.length > 0 ? true : false;
 
@@ -100,6 +103,7 @@ async function addInvoice(invoiceModel){
 
                 try{
                     let updateResponse = await INPatchInvoice(invoiceNumber, invoiceModel);
+                    console.log("Update Response: ");
                     console.log(updateResponse);
 
                 }
@@ -113,6 +117,8 @@ async function addInvoice(invoiceModel){
 
                 try {
                     let updateResponse = await INPostNewInvoice(client.id, invoiceModel);
+                    console.log(updateResponse);
+                    console.log("Update Response: ");
                     console.log(updateResponse);
                 }
                 catch(error){
@@ -195,22 +201,6 @@ async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCo
 
 }
 
-/*function patchUserUUID(uuid, applicationId){
-    let settings = {
-        "url": `http://10.3.50.9/uuid-master/uuids/${uuid}`,
-        "method": "PATCH",
-        "timeout": 0,
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "data": JSON.stringify({"facturatie":`${applicationId}`}),
-    };
-
-    $.ajax(settings).done(function (response) {
-        console.log("User should be have been patched");
-        console.log(response);
-    });
-}*/
 async function patchUserUUID(pUuid, applicationId){
     console.log("Start patchUserUuid");
     return await axios.patch(`http://10.3.50.9/uuid-master/uuids/${pUuid}`,
@@ -223,6 +213,7 @@ async function getAppIdFromUuid(pUuid) {
     return await axios.get(`http://10.3.50.9/uuid-master/uuids/${pUuid}`);
 
 }
+
 async function INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail){
     return await axios.post("http://localhost/projects/ninja/public/api/v1/clients", {
         name: pName,
@@ -269,6 +260,24 @@ async function INGetClient(pAppId){
     });
 }
 
+async function INSendMail(invoiceId){
+    return await axios.post(`http://localhost/projects/ninja/public/api/v1/email_invoice`, {
+        "id": `${invoiceId}`,
+    },{
+        headers: {
+            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        }
+    });
+}
+
+async function INGetInvoice(invoiceId){
+    return await axios.get(`http://localhost/projects/ninja/public/api/v1/invoices/${invoiceId}`, {
+        headers: {
+            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+        }
+    });
+}
+
 async function INPostNewInvoice(clientId, invoiceModel){
     // create the object
     let payload = {
@@ -277,17 +286,9 @@ async function INPostNewInvoice(clientId, invoiceModel){
         "paid": parseFloat(invoiceModel.add_invoice.paid),
     }
 
-    for(let line of invoiceModel.add_invoice.order_line){
-        console.log(line);
-        payload.invoice_items.push(
-            {
-                "product_key": `${line.name}`,
-                "notes": `${line.discount}`,
-                "cost": `${line.price}`,
-                "qty": `${line.quantity}`,
-            }
-        );
-    }
+    // Enter new items
+    payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, payload.invoice_items);
+
     console.log("payload: ");
     console.log(payload);
     console.table(payload);
@@ -300,13 +301,108 @@ async function INPostNewInvoice(clientId, invoiceModel){
                 "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
             }
         }
-    )
-
-
-
+    );
 }
 
 async function INPatchInvoice(invoiceNumber, invoiceModel){
+    // create the object
+    let payload = {
+        "invoice_items": [],
+        "paid": parseFloat(invoiceModel.add_invoice.paid),
+    }
 
+    // Get original invoice data
+    let originalInvoice = await INGetInvoice(invoiceNumber);
+    console.log("original invoice: ");
+    console.log(originalInvoice);
+    console.log("data1");
+    console.log(originalInvoice.data);
+    console.log("data2");
+    console.log(originalInvoice.data.data);
+
+    // Add old items back to the invoice
+    for(let line of originalInvoice.data.data.invoice_items){
+        console.log("Old line: ");
+        console.log(line);
+        payload.invoice_items.push(
+            {
+                "product_key": line.product_key,
+                "notes": line.notes,
+                "cost": line.cost,
+                "qty": line.qty,
+            }
+        );
+    }
+
+
+    // Enter new items
+    payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, payload.invoice_items);
+
+    console.log("payload: ");
+    console.log(payload);
+    console.table(payload);
+    console.log(invoiceModel);
+
+    return await axios.put(`http://localhost/projects/ninja/public/api/v1/invoices/${invoiceNumber}`,
+        payload,
+        {
+            headers: {
+                "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+            }
+        }
+    )
+}
+
+function createInvoicePayload(orderLines, existingItems){
+    let result = existingItems.length > 0 ? existingItems : [];
+
+    for(let line of orderLines){
+        console.log("New line");
+        console.log(line);
+        result.push(
+            {
+                "product_key": line.name,
+                "notes": line.discount,
+                "cost": line.price,
+                "qty": line.quantity,
+            }
+        );
+    }
+    return result;
+}
+
+async function INSendInvoiceMail(uuid){
+    // todo magic numbers removal
+    try{
+        let appIdResponse = await getAppIdFromUuid("e203909d-6a4f-4efd-9901-8bac4b6a9ec7");
+        let appId = appIdResponse.data.facturatie;
+        console.log(`AppId: ${appId}`);
+
+        try{
+            // Get user and his invoices
+            let clientWithInvoice = await INGetClient(123);
+            console.log(clientWithInvoice);
+            let invoiceId = clientWithInvoice.data.data.invoices[0].id;
+            console.log("Invoice id: ");
+            console.log(invoiceId);
+            try{
+                let response = await INSendMail(invoiceId);
+                console.log(response.data);
+            }
+            catch(error){
+                console.log("Couldn't send email");
+            }
+
+        }
+        catch(error){
+            console.log("error retrieving client to send an email to");
+        }
+
+
+    }
+    catch(error) {
+        console.log("Error when getting app id from uuid");
+        //console.log(error);
+    }
 }
 
