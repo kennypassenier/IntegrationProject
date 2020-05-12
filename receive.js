@@ -1,7 +1,16 @@
 "use strict"
 
 // Todo generate invoice ninja api key on VM and switch keys
+// Todo fill in mailtrap.io information and point to phantomjs
 // Todo change external ip to internal ip
+// Todo put messages everywhere
+// Todo generate new IN token
+// Todo make global constants like the api url's and invoice-ninja token
+// Todo refactor where possible
+// Todo Add relevant XSD files and import them
+// Todo come up with a way to get an invoice for an entire event
+// Todo Insert heartbeat into this file
+
 
 // Imports
 const amqp = require('amqplib/callback_api');
