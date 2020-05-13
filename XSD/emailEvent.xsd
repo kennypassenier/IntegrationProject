@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-    <xs:element name="email_invoice">
+    <xs:element name="email_event">
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="application_name" type="xs:string"/>
-                <xs:element name="uuid" type="xs:string"/>
+                <xs:element name="event_id" type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
