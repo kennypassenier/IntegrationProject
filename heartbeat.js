@@ -22,7 +22,7 @@ amqp.connect('amqp://facturatie_user:facturatie_pwd@10.3.50.9', function(error0,
             });
             channel.sendToQueue(queue, Buffer.from(msg));
 
-            console.log(" [x] Sent %s", msg);
+            console.log(` [x] Sent ${msg}`);
         }, 500);
 
 
