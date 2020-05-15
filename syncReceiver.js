@@ -54,6 +54,7 @@ const axiosConfig = {
         "X-Ninja-Token": `${INToken}`
     }
 }
+let canSendWaitMessage = true;
 
 connect();
 function connect(){
@@ -79,7 +80,7 @@ function connect(){
             }, 500);
             // Declare the queue you want to listen to
             let queue = "facturatie.queue";
-            console.log(`Waiting for messages in ${queue}. Exit with CTR+C`);
+            console.log(`Waiting for messages in ${queue}. Exit with CTRL+C`);
             consume(channel, queue);
         });
     });
@@ -88,6 +89,7 @@ function connect(){
 function consume(channel, queue){
     channel.get(queue, { noAck: false }, async function(err, msg) {
         if(msg){
+            canSendWaitMessage = true;
             currentChannel = channel;
             console.log("<--- Start of message --->");
             console.log(`Received message:  ${msg.content.toString()}`);
@@ -96,11 +98,14 @@ function consume(channel, queue){
                 await handleCases(messageXML);
             }
             catch(error){
-                sendMessage(error.toString(), true);
+                sendMessage("Unable to handle case", true);
             }
             console.log(`<--- End of message --->`);
         }
-        console.log("No message at the moment");
+        if(canSendWaitMessage){
+            console.log("Waiting for messages. Exit with CTRL+C");
+            canSendWaitMessage = false;
+        }
 
         consume(channel, queue);
         // Todo remove noAck below if everything is working
@@ -261,11 +266,11 @@ async function newINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode,
             sendMessage("New user has been successfully created.", false);
         }
         catch(error){
-            sendMessage(error.toString(), true);
+            sendMessage("Unable to patch user UUID", true);
         }
     }
     catch(error){
-        sendMessage(error.toString(), true);
+        sendMessage("Unable to post new client to Invoice Ninja", true);
     }
 }
 
@@ -280,11 +285,11 @@ async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCo
             sendMessage("User has been successfully updated.", false);
         }
         catch(error){
-            sendMessage(error.toString(), true);
+            sendMessage("Unable to patch user", true);
         }
     }
     catch(error){
-        sendMessage(error.toString(), true);
+        sendMessage("Unable to retrieve facturatie id", true);
     }
 }
 
@@ -306,7 +311,7 @@ async function addInvoice(invoiceModel){
                     await INPatchInvoice(invoiceNumber, invoiceModel);
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to update invoice", true);
                 }
             }
             else{
@@ -315,18 +320,18 @@ async function addInvoice(invoiceModel){
                     await INPostNewInvoice(client.id, invoiceModel);
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to create invoice", true);
                 }
             }
             // Send log to indicate that task is complete
             sendMessage("Invoice has been successfully added.", false);
         }
         catch(error){
-            sendMessage(error.toString(), true);
+            sendMessage("Unable to retrieve client", true);
         }
     }
     catch(error){
-        sendMessage(error.toString(), true);
+        sendMessage("Unable to retrieve facturatie id", true);
     }
 }
 
@@ -346,15 +351,15 @@ async function INSendInvoiceMail(uuid){
                 sendMessage("Invoice has been successfully sent via email.", false);
             }
             catch(error){
-                sendMessage(error.toString(), true);
+                sendMessage("Unable to send email", true);
             }
         }
         catch(error){
-            sendMessage(error.toString(), true);
+            sendMessage("Unable to retrieve user", true);
         }
     }
     catch(error) {
-        sendMessage(error.toString(), true);
+        sendMessage("Unable to retrieve facturatie id", true);
     }
 }
 
@@ -400,17 +405,17 @@ async function INSendEventMail(eventId){
                     sendMessage("Email with invoice for the entire event has been successfully sent by mail.")
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to send event invoice by mail", true);
                 }
             }
             catch(error){
-                sendMessage(error.toString(), true);
+                sendMessage("Unable to retrieve user id", true);
             }
         }
         sendMessage("No invoices found that match the given event_id", true);
     }
     catch(error){
-        sendMessage(error.toString(), true);
+        sendMessage("Unable to retrieve invoices", true);
     }
 
     /*
