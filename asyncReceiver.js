@@ -54,12 +54,13 @@ const axiosConfig = {
         "X-Ninja-Token": `${INToken}`
     }
 }
-
+const amqpUser = "facturatie_user";
+const amqpPassword = "facturatie_pwd";
 
 
 
 // Connect to the service
-amqp.connect(`amqp://facturatie_user:facturatie_pwd@${rabbitMQIP}`, function(error0, connection) {
+amqp.connect(`amqp://${amqpUser}:${amqpPassword}@${rabbitMQIP}`, function(error0, connection) {
     if(error0){
         console.log("Connection error");
         console.log(error0);
@@ -114,7 +115,7 @@ amqp.connect(`amqp://facturatie_user:facturatie_pwd@${rabbitMQIP}`, function(err
 
         console.log(`Waiting for messages in ${queue}. Exit with CTR+C`);
 
-        channel.consume(queue, function(msg) {
+        channel.consume(queue, async function(msg) {
             currentChannel = channel;
             console.log(`Received message:  ${msg.content.toString()}`);
             // Todo find a way to deal with ack, maybe make this global if everything is synchronously handled
@@ -122,7 +123,7 @@ amqp.connect(`amqp://facturatie_user:facturatie_pwd@${rabbitMQIP}`, function(err
 
             try{
                 let messageXML = libxmljs.parseXmlString(msg.content);
-                handleCases(messageXML);
+                await handleCases(messageXML);
             }
             catch(error){
                 allowRemoveFromQueue = true;
@@ -167,10 +168,15 @@ async function handleCases(messageXML){
                     let municipal = messageXML.get("//municipal").text();
                     let postalCode = messageXML.get("//postalCode").text();
                     let vat = messageXML.get("//vat").text();
-                    await newINUser(uuid, name, email, street, municipal, postalCode, vat);
+                    try{
+                        await newINUser(uuid, name, email, street, municipal, postalCode, vat);
+                    }
+                    catch(error){
+                        sendMessage("Unable to create new user in Invoice Ninja.", true);
+                    }
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to extract data from XML", true);
                 }
 
             }
@@ -193,10 +199,15 @@ async function handleCases(messageXML){
                     let municipal = messageXML.get("//municipal").text();
                     let postalCode = messageXML.get("//postalCode").text();
                     let vat = messageXML.get("//vat").text();
-                    await updateINUser(uuid, name, email, street, municipal, postalCode, vat);
+                    try{
+                        await updateINUser(uuid, name, email, street, municipal, postalCode, vat);
+                    }
+                    catch(error){
+                        sendMessage("Unable to update user in Invoice Ninja", true);
+                    }
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to extract data from XML", true);
                 }
             }
             else{
@@ -212,10 +223,15 @@ async function handleCases(messageXML){
                 try{
                     // Turn XML into JSON, makes it easier to handle and we have already validated the payload at this point
                     let messageJson = JSON.parse(xmlParser.toJson(messageXML.toString()));
-                    await addInvoice(messageJson);
+                    try{
+                        await addInvoice(messageJson);
+                    }
+                    catch(error){
+                        sendMessage("Unable to add new invoice to Invoice Ninja", true);
+                    }
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to convert XML to JSON", true);
                 }
             }
             else{
@@ -230,10 +246,15 @@ async function handleCases(messageXML){
                 // Valid XML
                 try{
                     let uuid = messageXML.get("//uuid").text();
-                    await INSendInvoiceMail(uuid);
+                    try{
+                        await INSendInvoiceMail(uuid);
+                    }
+                    catch(error){
+                        sendMessage("Unable to send email for this invoice", true);
+                    }
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to extract UUID from XML", true);
                 }
             }
             else{
@@ -247,10 +268,15 @@ async function handleCases(messageXML){
                 // Valid XML
                 try{
                     let eventId = messageXML.get("//event_id").text();
-                    await INSendEventMail(eventId);
+                    try{
+                        await INSendEventMail(eventId);
+                    }
+                    catch(error){
+                        sendMessage("Unable to send invoice email for this event", true);
+                    }
                 }
                 catch(error){
-                    sendMessage(error.toString(), true);
+                    sendMessage("Unable to extract event_id from XML", true);
                 }
             }
             else{
