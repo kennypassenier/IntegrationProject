@@ -14,7 +14,7 @@
                       <xs:element name="name" type="xs:string"/>
                       <xs:element name="quantity" type="xs:string"/>
                       <xs:element name="price" type="xs:string"/>
-                      <xs:element name="description" type="xs:string"/>
+                      <xs:element name="discount" type="xs:string"/>
                     </xs:sequence>
                   </xs:complexType>
                 </xs:element>

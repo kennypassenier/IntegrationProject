@@ -51,9 +51,8 @@ const axiosConfig = {
 startTest();
 
 async function startTest(){
-    let allClients = await INGetAllClientsAndInvoices();
-    //console.log(allClients);
-    console.log(allClients.data.data);
+/*
+
 // Create user
     let user = {
         name: "newUser",
@@ -67,7 +66,6 @@ async function startTest(){
     let newUserRes = await newINUser("e203909d-6a4f-4efd-9901-8bac4b6a9ec7", user.name, user.email, user.street, user.municipal, user.postalCode, user.vat, user.privateNotes);
     console.log(newUserRes);
     console.log("");
-/*
 
     // Patch user
     user.name = "updated";
@@ -79,29 +77,50 @@ async function startTest(){
 
 
     // Create invoice
-    let invoiceTest = "<add_invoice><application_name>kassa</application_name><uuid>e203909d-6a4f-4efd-9901-8bac4b6a9ec7</uuid><event_id>event 1</event_id><paid>0</paid><invoice_date>05-05-2020</invoice_date><order_line><name>[DISC] Discount</name><quantity>2.0</quantity><price>0.0</price><discount>0.0</discount></order_line><order_line><name>[TIPS] Tips</name><quantity>2.0</quantity><price>1.0</price><discount>0.0</discount></order_line></add_invoice>";
+    let invoiceTest = "" +
+        "<add_invoice>" +
+            "<application_name>kassa</application_name>" +
+            "<uuid>d7c9bdc0-daff-433f-ad40-ff28254210d2</uuid>" +
+            "<event_id>20</event_id>" +
+            "<paid>0</paid>" +
+            "<invoice_date>05-05-2020</invoice_date>" +
+            "<order_line>" +
+                "<name>testnaam</name>" +
+                "<quantity>25</quantity>" +
+                "<price>70.0</price>" +
+                "<discount>0.0</discount>" +
+            "</order_line><order_line>" +
+                "<name>testnaam2</name>" +
+                "<quantity>200.0</quantity>" +
+                "<price>159.0</price>" +
+                "<discount>0.0</discount>" +
+            "</order_line>" +
+        "</add_invoice>";
     let invoiceXML = libxmljs.parseXmlString(invoiceTest);
     //console.log(invoiceXML.toString());
     //console.log("Valid?");
     //console.log(invoiceXML.validate(addInvoiceDoc));
     // Transform xml to json
     let messageJson = JSON.parse(xmlParser.toJson(invoiceXML.toString()));
-    console.table(messageJson);
-    console.log(messageJson);
+    //console.table(messageJson);
+    //console.log(messageJson);
     for(let line of messageJson.add_invoice.order_line){
         console.log(line);
     }
     let addedInvoice = await addInvoice(messageJson);
     console.log(addedInvoice);
-
-    // Email invoice
-    await INSendInvoiceMail("e203909d-6a4f-4efd-9901-8bac4b6a9ec7");
-
-    // email for event
-    let eventMail = await INSendEventMail("eventNumber");
-    console.log(eventMail);
 */
 
+    // Email invoice
+    //await INSendInvoiceMail("d7c9bdc0-daff-433f-ad40-ff28254210d2");
+
+    // email for event
+    let eventMail = await INSendEventMail("20");
+    console.log(eventMail);
+    /*
+
+
+     */
 
 
 }
@@ -109,336 +128,445 @@ async function startTest(){
 
 
 
+async function handleCases(messageXML, channel, msg){
+    // Check what kind of event is being sent
+    // Which we can determine by checking the name of the root element
+
+    switch(messageXML.root().name()){
+        case "add_user":
+            console.log("Adding a new user");
+            // Validation
+            if(messageXML.validate(addUserDoc)){
+                // Valid XML
+                try{
+                    // Extract all the data from the XML message
+                    let uuid = messageXML.get("//uuid").text();
+                    let name = messageXML.get("//name").text();
+                    let email = messageXML.get("//email").text();
+                    let street = messageXML.get("//street").text();
+                    let municipal = messageXML.get("//municipal").text();
+                    let postalCode = messageXML.get("//postalCode").text();
+                    let vat = messageXML.get("//vat").text();
+                    try{
+                        await newINUser(uuid, name, email, street, municipal, postalCode, vat);
+                        channel.ack(msg);
+                    }
+                    catch(error){
+                        sendMessage("Unable to create new user in Invoice Ninja.", true);
+                    }
+                }
+                catch(error){
+                    sendMessage("Unable to extract data from XML", true);
+                }
+
+            }
+            else{
+                // Invalid XML
+                sendMessage("XML for new user could not be validated", true);
+            }
+            break;
+        case "patch_user":
+            console.log("Patching user");
+            // Validation
+            if(messageXML.validate(patchUserDoc)){
+                // Valid XML
+                try{
+                    // Extract all the data from the XML message
+                    let uuid = messageXML.get("//uuid").text();
+                    let name = messageXML.get("//name").text();
+                    let email = messageXML.get("//email").text();
+                    let street = messageXML.get("//street").text();
+                    let municipal = messageXML.get("//municipal").text();
+                    let postalCode = messageXML.get("//postalCode").text();
+                    let vat = messageXML.get("//vat").text();
+                    try{
+                        await updateINUser(uuid, name, email, street, municipal, postalCode, vat);
+                        channel.ack(msg);
+                    }
+                    catch(error){
+                        sendMessage("Unable to update user in Invoice Ninja", true);
+                    }
+                }
+                catch(error){
+                    sendMessage("Unable to extract data from XML", true);
+                }
+            }
+            else{
+                // Invalid XML
+                sendMessage( "XML to patch user could not be validated", true);
+            }
+            break;
+        case "add_invoice":
+            console.log("Adding a new invoice");
+            // Validation
+            if(messageXML.validate(addInvoiceDoc)){
+                // Valid XML
+                try{
+                    // Turn XML into JSON, makes it easier to handle and we have already validated the payload at this point
+                    let messageJson = JSON.parse(xmlParser.toJson(messageXML.toString()));
+                    try{
+                        await addInvoice(messageJson);
+                    }
+                    catch(error){
+                        sendMessage("Unable to add new invoice to Invoice Ninja", true);
+                    }
+                }
+                catch(error){
+                    sendMessage("Unable to convert XML to JSON", true);
+                }
+            }
+            else{
+                // Invalid XML
+                sendMessage( "XML to create invoice could not be validated", true);
+            }
+            break;
+        case "email_invoice":
+            console.log("Sending invoice by email");
+            // validation
+            if(messageXML.validate(emailInvoiceDoc)){
+                // Valid XML
+                try{
+                    let uuid = messageXML.get("//uuid").text();
+                    try{
+                        await INSendInvoiceMail(uuid);
+                    }
+                    catch(error){
+                        sendMessage("Unable to send email for this invoice", true);
+                    }
+                }
+                catch(error){
+                    sendMessage("Unable to extract UUID from XML", true);
+                }
+            }
+            else{
+                sendMessage("XML to email invoice could not be validated", true);
+            }
+            break;
+        case "email_event":
+            console.log("Sending invoice for the entire event");
+            // validation
+            if(messageXML.validate(emailEventDoc)){
+                // Valid XML
+                try{
+                    let eventId = messageXML.get("//event_id").text();
+                    try{
+                        await INSendEventMail(eventId);
+                    }
+                    catch(error){
+                        sendMessage("Unable to send invoice email for this event", true);
+                    }
+                }
+                catch(error){
+                    sendMessage("Unable to extract event_id from XML", true);
+                }
+            }
+            else{
+                sendMessage("XML to create email for this event could not be validated", true);
+            }
+            break;
+        default:
+            sendMessage( "Unknown case", true);
+    }
+}
 
 
-async function INSendEventMail(eventId){
-    console.log(eventId);
-    // Get all clients and their invoices
+// Functions that actually handle the cases
 
+// Handles the add_user case
+async function newINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat){
     try{
-        let allClientsResponse = await INGetAllClientsAndInvoices();
-        let allClients = allClientsResponse.data.data;
-        // Filter clients that have the eventId as private_notes
-        let filteredClients = [];
+        let newClientResponse = await INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail);
+        let appId = newClientResponse.data.data.id;
+        // Patch Master UUID
+        try{
+            await patchUserUUID(pUuid, appId);
+            // Send log to indicate that task is complete
+            sendMessage("New user has been successfully created.", false);
+        }
+        catch(error){
+            sendMessage("Unable to patch user UUID", true);
+        }
+    }
+    catch(error){
+        sendMessage("Unable to post new client to Invoice Ninja", true);
+    }
+}
 
-        let counter = 0;
-        for(let client of allClients){
-            console.log(counter++);
-            console.log(client.private_notes);
-            console.log(eventId);
-            if(client.private_notes === eventId){
-                filteredClients.push(client);
+// Handles the patch_user case
+async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat){
+    try{
+        let appIdResponse = await getAppIdFromUuid(pUuid);
+        let appId = appIdResponse.data.facturatie;
+        try{
+            await INPatchClient(appId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail);
+            // Send log to indicate that task is complete
+            sendMessage("User has been successfully updated.", false);
+        }
+        catch(error){
+            sendMessage("Unable to patch user", true);
+        }
+    }
+    catch(error){
+        sendMessage("Unable to retrieve facturatie id", true);
+    }
+}
+
+// Handles the add_invoice case
+async function addInvoice(invoiceModel){
+    try{
+        console.log(`InvoiceModel:`);
+        console.log(invoiceModel);
+        for(let line of invoiceModel.add_invoice.order_line){
+            console.log(line);
+        }
+        let appIdResponse = await getAppIdFromUuid(invoiceModel.add_invoice.uuid);
+        let appId = appIdResponse.data.facturatie;
+        console.log(`AppId: ${appId}`);
+        try{
+            // Determine if we have to create a new invoice, or update one that exists already
+            let clientResponse = await INGetClient(appId);
+            let client = clientResponse.data.data;
+            let invoicesExist = client.invoices.length > 0;
+            if(invoicesExist){
+                // Update invoice
+                let invoiceNumber = client.invoices[0].id;
+                console.log("Invoice already exists, here is the number: ");
+                console.log(invoiceNumber);
+
+                try{
+                    console.log("Patching invoice");
+                    console.log(`InvoiceNumber: ${invoiceNumber}`);
+                    console.log("invoiceModel: ");
+                    console.log(invoiceModel);
+                    await INPatchInvoice(invoiceNumber, invoiceModel);
+                    sendMessage("Invoice has been successfully updated.", false);
+                }
+                catch(error){
+                    console.log("------------------------------");
+                    //console.log(error);
+                    sendMessage("Unable to update invoice", true);
+                }
+            }
+            else{
+                // Create new invoice
+                try {
+                    console.log("Creating new invoice");
+                    await INPostNewInvoice(client.id, invoiceModel, true);
+                    sendMessage("Invoice has been successfully created.", false);
+                }
+                catch(error){
+                    sendMessage("Unable to create invoice", true);
+                }
+            }
+            // Send log to indicate that task is complete
+        }
+        catch(error){
+            sendMessage("Unable to retrieve client", true);
+        }
+    }
+    catch(error){
+        sendMessage("Unable to retrieve facturatie id", true);
+    }
+}
+
+// Handles the email_invoice case
+async function INSendInvoiceMail(uuid){
+    // todo magic numbers removal
+    try{
+        let appIdResponse = await getAppIdFromUuid(uuid);
+        let appId = appIdResponse.data.facturatie;
+        try{
+            // Get user and his invoices
+            let clientWithInvoice = await INGetClient(appId);
+            let invoiceId = clientWithInvoice.data.data.invoices[0].id;
+            try{
+                await INSendMail(invoiceId);
+                // Send log to indicate that task is complete
+                sendMessage("Invoice has been successfully sent via email.", false);
+            }
+            catch(error){
+                sendMessage("Unable to send email", true);
             }
         }
-        if(filteredClients.length > 0){
-            console.log("length > 0");
-            // Combine all the info from their invoices and store it
+        catch(error){
+            sendMessage("Unable to retrieve user", true);
+        }
+    }
+    catch(error) {
+        sendMessage("Unable to retrieve facturatie id", true);
+    }
+}
+
+// Handles the email_event case
+async function INSendEventMail(eventId){
+    // Get all invoices
+    try{
+        let allInvoicesResponse = await INGetAllInvoices();
+        let allInvoices = allInvoicesResponse.data.data;
+        // Filter invoices that have the event_id as private notes
+        let filteredInvoices = [];
+        for(let invoice of allInvoices){
+            if(invoice.private_notes === eventId){
+                filteredInvoices.push(invoice);
+            }
+        }
+        if(filteredInvoices.length > 0){
+            // Combine all the info from these invoices and store them
             let combinedInvoiceItems = [];
             let alreadyPaid = 0;
-            for(let client of filteredClients){
-                if(client.invoices.length > 0){
-                    console.log(client.invoices[0].invoice_items);
-                    // todo add already paid info
-
-                    /*
-                    let tempInvoiceItems = createInvoicePayload(tempInvoiceItemsTest, [], false);
-                    console.log(tempInvoiceItems);
-                    combinedInvoiceItems.push(...tempInvoiceItems);
-                    }*/
-                    // todo refactor
-                    for(let invoice_item of client.invoices[0].invoice_items) {
-                        combinedInvoiceItems.push(
-                            {
-                                "product_key": invoice_item.product_key,
-                                "notes": invoice_item.notes,
-                                "cost": invoice_item.cost,
-                                "qty": invoice_item.qty,
-                            }
-                        );
-                    }
-                    console.log("comb items length");
-                    console.log(combinedInvoiceItems.length);
-                    console.table(combinedInvoiceItems);
-                }
-                else{
-                    console.log("No invoices");
-                }
-
+            for(let inv of filteredInvoices){
+                let paid = inv.amount - inv.balance;
+                alreadyPaid += paid;
+                let tempInvoiceItems = createInvoicePayload(inv.invoice_items, [], false);
+                combinedInvoiceItems.push(...tempInvoiceItems);
             }
-            // Create new client from template
             try{
                 let newClientResponse = await INPostNewClient(standardUserToSendEventInfo.name, standardUserToSendEventInfo.street, standardUserToSendEventInfo.postalCode, standardUserToSendEventInfo.municipal, standardUserToSendEventInfo.vat, standardUserToSendEventInfo.email, "");
                 let newclientId = newClientResponse.data.data.id;
-                console.log("new client id");
-                console.log(newclientId);
                 // Create new invoice from the stored data
-
                 let invoiceModel = {
                     add_invoice: {
                         paid: alreadyPaid,
                         order_line: combinedInvoiceItems
                     }
                 }
-                //console.log(invoiceModel);
-                console.log("INPOSTNEWINVOICE: ");
-                console.log(newclientId);
-                console.log(invoiceModel);
                 let newInvoiceResponse = await INPostNewInvoice(newclientId, invoiceModel, false);
-                console.log("NEWINVOICERESPONSE");
-                console.log(newInvoiceResponse.data);
                 let newInvoiceId = newInvoiceResponse.data.data.id;
-                console.log("Invoice id: ");
-                console.log(newInvoiceId);
                 // Send the invoice by mail
                 try{
-                    let sentEmailResponse = await INSendMail(newInvoiceId);
-                    console.log(sentEmailResponse.data);
+                    await INSendMail(newInvoiceId);
+                    // Send log to indicate that task is complete
+                    sendMessage("Email with invoice for the entire event has been successfully sent by mail.")
                 }
                 catch(error){
-                    console.log("can't send mail");
+                    sendMessage("Unable to send event invoice by mail", true);
                 }
-            /*
-             */
             }
             catch(error){
-                console.log("can't post new client");
+                sendMessage("Unable to retrieve user id", true);
             }
-
         }
         else{
-            console.log("No clients with eventID found");
+            sendMessage("No invoices found that match the given event_id", true);
         }
     }
     catch(error){
-        console.log(error.toString());
+        sendMessage("Unable to retrieve invoices", true);
     }
 }
 
+// Helper functions
+function createInvoicePayload(orderLines, existingItems, comesFromXML){
 
+    // Items that come out of XML have different names than the items coming from Invoice Ninja
+    let result = existingItems.length > 0 ? existingItems : [];
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-async function INGetAllClientsAndInvoices(){
-    return await axios.get(`${INApiUrl}clients?include=invoices`, axiosConfig);
-}
-
-// Patch invoice
-
-// Mail invoice
-
-async function addInvoice(invoiceModel){
-    try{
-        let appIdResponse = await getAppIdFromUuid(invoiceModel.uuid);
-        let appId = appIdResponse.data.facturatie;
-        console.log(`AppId: ${appId}`);
-        try{
-            // Determine if we have to create a new invoice, or update one that exists already
-
-            let clientResponse = await INGetClient(appId);
-            let client = clientResponse.data.data;
-
-            //console.log("Client: ");
-            //console.log(client);
-            let invoicesExist = client.invoices.length > 0 ? true : false;
-
-            if(invoicesExist){
-                // Update invoice
-                let invoiceNumber = client.invoices[0].id;
-
-                try{
-                    let updateResponse = await INPatchInvoice(invoiceNumber, invoiceModel);
-                    console.log("Update Response: ");
-                    console.log(updateResponse);
-
-                }
-                catch(error){
-                    console.log("Failed to update invoice");
-                }
-
-            }
-            else{
-                // Create new invoice
-
-                try {
-                    let updateResponse = await INPostNewInvoice(client.id, invoiceModel);
-                    console.log(updateResponse);
-                    console.log("Update Response: ");
-                    console.log(updateResponse);
-                }
-                catch(error){
-                    //console.log(error);
-                    console.log("Failed to create invoice");
-                }
-            }
-            // todo send message to log exchange
-        }
-        catch(error){
-            console.log(error);
-            console.log("Failure to add or update invoice");
-        }
+    for(let line of orderLines){
+        result.push(
+            {
+                "product_key": comesFromXML ? line.name : line.product_key,
+                "cost": comesFromXML ? line.price : line.cost,
+                "qty": comesFromXML ? line.quantity : line.qty,
+                "notes": " "
+            },
+        );
     }
-    catch(error){
-        console.log("Error when getting app id from uuid");
-        //console.log(error);
-    }
+    return result;
 }
 
-
-
-
-async function newINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat, pPrivateNotes){
-
-    console.log("Posting the following data to invoiceninja: ");
-    console.log(pUuid, pName, pEmail, pMunicipal, pStreet, pPostalCode, pVat);
-
-    // Post to IN
-    try{
-        let newClientResponse = await INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail, pPrivateNotes);
-        let appId = newClientResponse.data.data.id;
-        console.log(`Patching user in masterUUID with uuid: ${pUuid} and appId: ${appId}`);
-        // Patch Master UUID
-        try{
-            await patchUserUUID(pUuid, appId);
-            console.log("patchUserUUID succesfull")
-        }
-        catch(error){
-            console.log("patchUserUUID failure")
-        }
-    }
-    catch(error){
-        console.log("Error when posting new client to IN");
-    }
-
+function sendMessage(message, isError){
+    let messageType = !isError ? "log" : "error";
+    let enhancedMessage = `<?xml version="1.0" encoding="utf-8"?>
+            <${messageType}>
+                <application_name>facturatie</application_name>
+                <timestamp>${new Date().toISOString()}</timestamp>
+                <message>${message}</message>
+            </${messageType}>`;
+    let exchange = `${messageType}s.exchange`;
+    console.log(`${enhancedMessage} sent to ${exchange}`);
+    return;
+    currentChannel.publish(exchange, "", Buffer.from(enhancedMessage));
 }
 
-async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCode, pVat, pPrivateNotes){
-    console.log("Updating IN user");
-    try{
-        let appIdResponse = await getAppIdFromUuid(pUuid);
-        let appId = appIdResponse.data.facturatie;
-        console.log(`AppId: ${appId}`);
-        try{
-            let updateClientResponse = await INPatchClient(appId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail, pPrivateNotes);
-            // todo send message to log exchange
-
-        }
-        catch(error){
-            console.log(error);
-            console.log("Failure to patch IN user");
-        }
-    }
-    catch(error){
-        console.log("Error when getting app id from uuid");
-        //console.log(error);
-    }
+function currentHeartbeat(){
+    return `<?xml version="1.0" encoding="utf-8"?>
+            <heartbeat>
+                <application_name>facturatie</application_name>
+                <timestamp>${new Date().toISOString()}</timestamp>
+            </heartbeat>`;
 }
 
-async function patchUserUUID(pUuid, applicationId){
-    return await axios.patch(`http://10.3.50.9/uuid-master/uuids/${pUuid}`,
-        {"facturatie":`${applicationId}`}
-    );
-}
-
-async function getAppIdFromUuid(pUuid) {
-    return await axios.get(`http://10.3.50.9/uuid-master/uuids/${pUuid}`);
-
-}
-
-async function INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail, pPrivateNotes){
-    return await axios.post("http://localhost/projects/ninja/public/api/v1/clients", {
-        name: pName,
-        address1: pStreet,
-        postal_code: pPostalCode,
-        city: pMunicipal,
-        vat_number: pVat,
-        private_notes: pPrivateNotes,
-        contact:{
-            last_name: pName,
-            email: pEmail
-        }
-
-    }, {
-        headers: {
-            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
-        }
-    });
-}
-
-async function INPatchClient(pAppId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail, pPrivateNotes){
-    return await axios.put(`http://localhost/projects/ninja/public/api/v1/clients/${pAppId}`, {
-        name: pName,
-        address1: pStreet,
-        postal_code: pPostalCode,
-        city: pMunicipal,
-        private_notes: pPrivateNotes,
-        vat_number: pVat,
-        contact:{
-            last_name: pName,
-            email: pEmail
-        }
-
-    }, {
-        headers: {
-            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
-        }
-    });
-}
-
+// Functions that use API calls directly to Invoice Ninja
+// GET
 async function INGetClient(pAppId){
-    return await axios.get(`http://localhost/projects/ninja/public/api/v1/clients/${pAppId}?include=invoices`, {
-        headers: {
-            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
-        }
-    });
-}
-
-async function INSendMail(invoiceId){
-    return await axios.post(`http://localhost/projects/ninja/public/api/v1/email_invoice`, {
-        "id": `${invoiceId}`,
-    },{
-        headers: {
-            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
-        }
-    });
+    return await axios.get(`${INApiUrl}clients/${pAppId}?include=invoices`, axiosConfig);
 }
 
 async function INGetInvoice(invoiceId){
-    return await axios.get(`http://localhost/projects/ninja/public/api/v1/invoices/${invoiceId}`, {
-        headers: {
-            "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
+    return await axios.get(`${INApiUrl}invoices/${invoiceId}`, axiosConfig);
+}
+
+/*
+async function INGetAllClientsAndInvoices(){
+    return await axios.get(`${INApiUrl}clients?include=invoices`, axiosConfig);
+}
+*/
+
+async function INGetAllInvoices(){
+    return await axios.get(`${INApiUrl}invoices`, axiosConfig);
+}
+
+// POST
+async function INPostNewClient(pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail){
+    return await axios.post(`${INApiUrl}clients`, {
+        name: pName,
+        address1: pStreet,
+        postal_code: pPostalCode,
+        city: pMunicipal,
+        vat_number: pVat,
+        contact:{
+            last_name: pName,
+            email: pEmail
         }
-    });
+    }, axiosConfig);
+}
+
+async function INSendMail(invoiceId){
+    return await axios.post(`${INApiUrl}email_invoice`, {
+        "id": `${invoiceId}`,
+    },axiosConfig);
 }
 
 async function INPostNewInvoice(clientId, invoiceModel, comesFromXML){
-    console.log("new invoice");
     // create the object
     let payload = {
         "client_id": `${clientId}`,
         "invoice_items": [],
         "paid": parseFloat(invoiceModel.add_invoice.paid),
-    }
+        "private_notes": invoiceModel.add_invoice.event_id,
+    };
     // Enter new items
-    payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, payload.invoice_items, comesFromXML);
-    return await axios.post("http://localhost/projects/ninja/public/api/v1/invoices",
-        payload,
-        {
-            headers: {
-                "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
-            }
+    payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, [], comesFromXML);
+
+    console.log("Payload before creating new invoice: ");
+    console.log(payload);
+    return await axios.post(`${INApiUrl}invoices`, payload, axiosConfig);
+}
+
+
+// PUT
+async function INPatchClient(pAppId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail){
+    return await axios.put(`${INApiUrl}clients/${pAppId}`, {
+        name: pName,
+        address1: pStreet,
+        postal_code: pPostalCode,
+        city: pMunicipal,
+        vat_number: pVat,
+        contact:{
+            last_name: pName,
+            email: pEmail
         }
-    );
+    }, axiosConfig);
 }
 
 async function INPatchInvoice(invoiceNumber, invoiceModel){
@@ -446,106 +574,30 @@ async function INPatchInvoice(invoiceNumber, invoiceModel){
     let payload = {
         "invoice_items": [],
         "paid": parseFloat(invoiceModel.add_invoice.paid),
-    }
-
+        "private_notes": invoiceModel.add_invoice.event_id,
+    };
     // Get original invoice data
     let originalInvoice = await INGetInvoice(invoiceNumber);
-    console.log("original invoice: ");
-    console.log(originalInvoice);
-    console.log("data1");
-    console.log(originalInvoice.data);
-    console.log("data2");
-    console.log(originalInvoice.data.data);
-
     // Add old items back to the invoice
     payload.invoice_items = createInvoicePayload(originalInvoice.data.data.invoice_items, payload.invoice_items, false);
-    /*
-    // todo refactor
-    for(let line of originalInvoice.data.data.invoice_items){
-        console.log("Old line: ");
-        console.log(line);
-        payload.invoice_items.push(
-            {
-                "product_key": line.product_key,
-                "notes": line.notes,
-                "cost": line.cost,
-                "qty": line.qty,
-            }
-        );
-    }
-     */
-
-
     // Enter new items
     payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, payload.invoice_items, true);
 
-    console.log("payload: ");
-    console.log(payload);
-    console.table(payload);
-    console.log(invoiceModel);
+    console.log("Creating test: ");
 
-    return await axios.put(`http://localhost/projects/ninja/public/api/v1/invoices/${invoiceNumber}`,
-        payload,
-        {
-            headers: {
-                "X-Ninja-Token": "clzjfmtlwcmzjl3l328epk2hkezxj013"
-            }
-        }
-    )
+
+    return await axios.put(`${INApiUrl}invoices/${invoiceNumber}`, payload, axiosConfig);
 }
 
-function createInvoicePayload(orderLines, existingItems, comesFromXML){
-    // comesFromXML has different names for the data, so we have to differentiate
-    let result = existingItems.length > 0 ? existingItems : [];
-
-    for(let line of orderLines){
-        //console.log("New line");
-        //console.log(line);
-        result.push(
-            {
-                "product_key": comesFromXML ? line.name : line.product_key,
-                "notes": comesFromXML ? line.description : line.notes,
-                "cost": comesFromXML ? line.price : line.cost,
-                "qty": comesFromXML ? line.quantity : line.qty,
-            }
-        );
-    }
-    //console.log(result);
-    return result;
+// Functions that call the Master UUID
+// GET
+async function getAppIdFromUuid(pUuid) {
+    return await axios.get(`http://${rabbitMQIP}/uuid-master/uuids/${pUuid}`);
 }
 
-async function INSendInvoiceMail(uuid){
-    // todo magic numbers removal
-    try{
-        let appIdResponse = await getAppIdFromUuid(uuid);
-        let appId = appIdResponse.data.facturatie;
-        console.log(`AppId: ${appId}`);
-
-        try{
-            // Get user and his invoices
-            let clientWithInvoice = await INGetClient(appId);
-            console.log(clientWithInvoice);
-            let invoiceId = clientWithInvoice.data.data.invoices[0].id;
-            console.log("Invoice id: ");
-            console.log(invoiceId);
-            try{
-                let response = await INSendMail(invoiceId);
-                console.log(response.data);
-            }
-            catch(error){
-                console.log("Couldn't send email");
-            }
-
-        }
-        catch(error){
-            console.log("error retrieving client to send an email to");
-        }
-
-
-    }
-    catch(error) {
-        console.log("Error when getting app id from uuid");
-        //console.log(error);
-    }
+// PATCH
+async function patchUserUUID(pUuid, applicationId){
+    return await axios.patch(`http://${rabbitMQIP}/uuid-master/uuids/${pUuid}`,
+        {"facturatie":`${applicationId}`}
+    );
 }
-
