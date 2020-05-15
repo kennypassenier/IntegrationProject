@@ -351,14 +351,19 @@ async function INSendInvoiceMail(uuid){
         try{
             // Get user and his invoices
             let clientWithInvoice = await INGetClient(appId);
-            let invoiceId = clientWithInvoice.data.data.invoices[0].id;
             try{
-                await INSendMail(invoiceId);
-                // Send log to indicate that task is complete
-                sendMessage("Invoice has been successfully sent via email.", false);
+                let invoiceId = clientWithInvoice.data.data.invoices[0].id;
+                try{
+                    await INSendMail(invoiceId);
+                    // Send log to indicate that task is complete
+                    sendMessage("Invoice has been successfully sent via email.", false);
+                }
+                catch(error){
+                    sendMessage("Unable to send email", true);
+                }
             }
             catch(error){
-                sendMessage("Unable to send email", true);
+                sendMessage("User does not have any invoices", true);
             }
         }
         catch(error){
