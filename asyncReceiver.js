@@ -77,38 +77,16 @@ amqp.connect(`amqp://${amqpUser}:${amqpPassword}@${rabbitMQIP}`, function(error0
             console.log("Create channel error");
             console.error(error1);
         }
-
-
-
-
         // Send heartbeats
         setInterval(function(){
-            let queue = 'heartbeats.exchange';
+            let exchange = 'heartbeats.exchange';
             let msg = currentHeartbeat();
-
-            channel.assertQueue(queue, {
-                durable: false
-            });
-            channel.sendToQueue(queue, Buffer.from(msg));
-
+            channel.publish(exchange, "", Buffer.from(msg));
             //console.log(` [x] Sent ${msg}`);
         }, 500);
-
-
-
-
-
-
-
-
-
-
         // Declare the queue you want to listen to
-        let queue = "facturatie.queue"
+        let queue = "facturatie.queue";
 
-        /*channel.assertQueue(queue, {
-            durable: true
-        });*/
         // Todo test for synchronicity
         // Todo make global variable to store message, so we can easily ack everything
         //channel.prefetch(1);
@@ -316,7 +294,7 @@ async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCo
         let appIdResponse = await getAppIdFromUuid(pUuid);
         let appId = appIdResponse.data.facturatie;
         try{
-            let updateClientResponse = await INPatchClient(appId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail);
+            await INPatchClient(appId, pName, pStreet, pPostalCode, pMunicipal, pVat, pEmail);
             // Send log to indicate that task is complete
             sendMessage("User has been successfully updated.", false);
         }
@@ -338,7 +316,7 @@ async function addInvoice(invoiceModel){
             // Determine if we have to create a new invoice, or update one that exists already
             let clientResponse = await INGetClient(appId);
             let client = clientResponse.data.data;
-            let invoicesExist = client.invoices.length > 0 ? true : false;
+            let invoicesExist = client.invoices.length > 0;
             if(invoicesExist){
                 // Update invoice
                 let invoiceNumber = client.invoices[0].id;
@@ -538,12 +516,9 @@ function sendMessage(message, isError){
                 <timestamp>${new Date().toISOString()}</timestamp>
                 <message>${message}</message>
             </${messageType}>`;
-    let queueName = `${messageType}s.exchange`;
-    currentChannel.assertQueue(queueName, {
-        durable:false
-    });
-    currentChannel.sendToQueue(queueName, Buffer.from(enhancedMessage));
-    console.log(`${enhancedMessage} sent to ${queueName}`);
+    let exchange = `${messageType}s.exchange`;
+    currentChannel.publish(exchange, "", Buffer.from(enhancedMessage));
+    console.log(`${enhancedMessage} sent to ${exchange}`);
 }
 
 function currentHeartbeat(){
@@ -563,10 +538,11 @@ async function INGetClient(pAppId){
 async function INGetInvoice(invoiceId){
     return await axios.get(`${INApiUrl}invoices/${invoiceId}`, axiosConfig);
 }
-
+/*
 async function INGetAllClientsAndInvoices(){
     return await axios.get(`${INApiUrl}clients?include=invoices`, axiosConfig);
 }
+ */
 
 async function INGetAllInvoices(){
     return await axios.get(`${INApiUrl}invoices`, axiosConfig);

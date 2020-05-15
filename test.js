@@ -62,7 +62,6 @@ async function startTest(){
         municipal: "stad",
         postalCode: "1000",
         vat: "123456789",
-        privateNotes: "eventNumber"
     }
     console.log("Creating user 1");
     let newUserRes = await newINUser("e203909d-6a4f-4efd-9901-8bac4b6a9ec7", user.name, user.email, user.street, user.municipal, user.postalCode, user.vat, user.privateNotes);
