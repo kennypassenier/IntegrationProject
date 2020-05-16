@@ -6,26 +6,22 @@
 trigger:
 - master
 
-pool:
-  vmImage: 'windows-latest'
+pool: default
 
 steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-  displayName: 'Install Node.js'
+- script: |
+    cd c:/
+    git fetch
+    git checkout --force $BUILD_SOURCEVERSION
+  displayName: 'Updating Git repository'
 
 - script: |
+    cd c:/IntegrationProject
     npm install
-    npm run build
-  displayName: 'npm install and build'
+  displayName: 'Installing dependencies'
   
-- task: DownloadGitHubRelease@0
-  inputs:
-    connection: 'github connection 1'
-    userRepository: 'kennypassenier/IntegrationProject'
-    defaultVersionType: 'latest'
-    downloadPath: '$(System.ArtifactsDirectory)'
-
+- script: |
+    node syncReceiver.js
+  displayName: 'Running application'
 
 
