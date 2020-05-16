@@ -25,7 +25,7 @@ steps:
   displayName: 'Installing dependencies'
   
 - powershell: |
-    node syncReceiver.js
+    node ./syncReceiver.js
   displayName: 'Running application'
 
 
