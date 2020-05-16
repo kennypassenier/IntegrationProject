@@ -14,7 +14,7 @@ steps:
   displayName: 'testing'
 
 - powershell: |
-    cd c:/
+    cd c:/IntegrationProject
     git fetch
     git checkout --force $BUILD_SOURCEVERSION
   displayName: 'Updating Git repository'
