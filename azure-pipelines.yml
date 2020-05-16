@@ -9,18 +9,18 @@ trigger:
 pool: default
 
 steps:
-- pwsh: |
+- powershell: |
     cd c:/
     git fetch
     git checkout --force $BUILD_SOURCEVERSION
   displayName: 'Updating Git repository'
 
-- pwsh: |
+- powershell: |
     cd c:/IntegrationProject
     npm install
   displayName: 'Installing dependencies'
   
-- pwsh: |
+- powershell: |
     node syncReceiver.js
   displayName: 'Running application'
 
