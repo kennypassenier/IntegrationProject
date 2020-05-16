@@ -1,12 +1,4 @@
 "use strict"
-
-// Todo generate invoice ninja api key on VM and switch keys
-// Todo fill in mailtrap.io information and point to phantomjs
-// Todo change external ip to internal ip
-// Todo generate new IN token
-// Todo Insert heartbeat into this file
-
-
 // Imports
 const amqp = require('amqplib/callback_api');
 const axios = require("axios").default;
@@ -119,7 +111,6 @@ function consume(channel, queue){
         }
 
         consume(channel, queue);
-        // Todo remove noAck below if everything is working
     });
 }
 
@@ -350,7 +341,6 @@ async function addInvoice(invoiceModel){
 
 // Handles the email_invoice case
 async function INSendInvoiceMail(uuid){
-    // todo magic numbers removal
     try{
         let appIdResponse = await getAppIdFromUuid(uuid);
         let appId = appIdResponse.data.facturatie;
