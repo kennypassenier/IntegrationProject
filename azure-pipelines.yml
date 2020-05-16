@@ -26,7 +26,6 @@ steps:
     userRepository: 'kennypassenier/IntegrationProject'
     defaultVersionType: 'latest'
     downloadPath: '$(System.ArtifactsDirectory)'
-    userRepository: kennypassenier/IntegrationProject
 
 
 
