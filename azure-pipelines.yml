@@ -9,9 +9,9 @@ trigger:
 pool: default
 
 steps:
-- powershell: 
-  cd c:/
-displayName: 'testing'
+- powershell: |
+    cd c:/
+  displayName: 'testing'
 
 - powershell: |
     cd c:/
