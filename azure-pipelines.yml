@@ -10,10 +10,6 @@ pool: default
 
 steps:
 - powershell: |
-    cd c:/
-  displayName: 'testing'
-
-- powershell: |
     cd c:/IntegrationProject
     git fetch
     git checkout --force $BUILD_SOURCEVERSION
