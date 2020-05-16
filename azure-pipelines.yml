@@ -9,6 +9,11 @@ trigger:
 pool: default
 
 steps:
+- script: |
+    cd c:/nssm/win64
+    nssm stop IntegrationProjectService
+  displayName: 'Stopping integration service'
+
 - powershell: |
     cd c:/IntegrationProject
     git pull origin master
@@ -24,4 +29,7 @@ steps:
     #node .\syncReceiver.js
   displayName: 'Running application'
 
-
+- script: |
+    cd c:/nssm/win64
+    nssm start IntegrationProjectService
+  displayName: 'Starting integration service'
