@@ -127,8 +127,7 @@ async function startTest(){
 
 
 
-
-async function handleCases(messageXML, channel, msg){
+async function handleCases(messageXML){
     // Check what kind of event is being sent
     // Which we can determine by checking the name of the root element
 
@@ -149,7 +148,6 @@ async function handleCases(messageXML, channel, msg){
                     let vat = messageXML.get("//vat").text();
                     try{
                         await newINUser(uuid, name, email, street, municipal, postalCode, vat);
-                        channel.ack(msg);
                     }
                     catch(error){
                         sendMessage("Unable to create new user in Invoice Ninja.", true);
@@ -181,7 +179,6 @@ async function handleCases(messageXML, channel, msg){
                     let vat = messageXML.get("//vat").text();
                     try{
                         await updateINUser(uuid, name, email, street, municipal, postalCode, vat);
-                        channel.ack(msg);
                     }
                     catch(error){
                         sendMessage("Unable to update user in Invoice Ninja", true);
@@ -314,14 +311,8 @@ async function updateINUser(pUuid, pName, pEmail, pStreet, pMunicipal, pPostalCo
 // Handles the add_invoice case
 async function addInvoice(invoiceModel){
     try{
-        console.log(`InvoiceModel:`);
-        console.log(invoiceModel);
-        for(let line of invoiceModel.add_invoice.order_line){
-            console.log(line);
-        }
         let appIdResponse = await getAppIdFromUuid(invoiceModel.add_invoice.uuid);
         let appId = appIdResponse.data.facturatie;
-        console.log(`AppId: ${appId}`);
         try{
             // Determine if we have to create a new invoice, or update one that exists already
             let clientResponse = await INGetClient(appId);
@@ -330,20 +321,12 @@ async function addInvoice(invoiceModel){
             if(invoicesExist){
                 // Update invoice
                 let invoiceNumber = client.invoices[0].id;
-                console.log("Invoice already exists, here is the number: ");
-                console.log(invoiceNumber);
-
                 try{
                     console.log("Patching invoice");
-                    console.log(`InvoiceNumber: ${invoiceNumber}`);
-                    console.log("invoiceModel: ");
-                    console.log(invoiceModel);
                     await INPatchInvoice(invoiceNumber, invoiceModel);
                     sendMessage("Invoice has been successfully updated.", false);
                 }
                 catch(error){
-                    console.log("------------------------------");
-                    //console.log(error);
                     sendMessage("Unable to update invoice", true);
                 }
             }
@@ -378,14 +361,19 @@ async function INSendInvoiceMail(uuid){
         try{
             // Get user and his invoices
             let clientWithInvoice = await INGetClient(appId);
-            let invoiceId = clientWithInvoice.data.data.invoices[0].id;
             try{
-                await INSendMail(invoiceId);
-                // Send log to indicate that task is complete
-                sendMessage("Invoice has been successfully sent via email.", false);
+                let invoiceId = clientWithInvoice.data.data.invoices[0].id;
+                try{
+                    await INSendMail(invoiceId);
+                    // Send log to indicate that task is complete
+                    sendMessage("Invoice has been successfully sent via email.", false);
+                }
+                catch(error){
+                    sendMessage("Unable to send email", true);
+                }
             }
             catch(error){
-                sendMessage("Unable to send email", true);
+                sendMessage("User does not have any invoices", true);
             }
         }
         catch(error){
@@ -397,6 +385,7 @@ async function INSendInvoiceMail(uuid){
     }
 }
 
+// Handles the email_event case
 // Handles the email_event case
 async function INSendEventMail(eventId){
     // Get all invoices
@@ -460,14 +449,13 @@ function createInvoicePayload(orderLines, existingItems, comesFromXML){
 
     // Items that come out of XML have different names than the items coming from Invoice Ninja
     let result = existingItems.length > 0 ? existingItems : [];
-
     for(let line of orderLines){
         result.push(
             {
                 "product_key": comesFromXML ? line.name : line.product_key,
                 "cost": comesFromXML ? line.price : line.cost,
                 "qty": comesFromXML ? line.quantity : line.qty,
-                "notes": " "
+                "notes": comesFromXML ? "" : line.notes,
             },
         );
     }
@@ -483,9 +471,8 @@ function sendMessage(message, isError){
                 <message>${message}</message>
             </${messageType}>`;
     let exchange = `${messageType}s.exchange`;
-    console.log(`${enhancedMessage} sent to ${exchange}`);
-    return;
     currentChannel.publish(exchange, "", Buffer.from(enhancedMessage));
+    console.log(`${enhancedMessage} sent to ${exchange}`);
 }
 
 function currentHeartbeat(){
@@ -547,9 +534,6 @@ async function INPostNewInvoice(clientId, invoiceModel, comesFromXML){
     };
     // Enter new items
     payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, [], comesFromXML);
-
-    console.log("Payload before creating new invoice: ");
-    console.log(payload);
     return await axios.post(`${INApiUrl}invoices`, payload, axiosConfig);
 }
 
@@ -582,9 +566,6 @@ async function INPatchInvoice(invoiceNumber, invoiceModel){
     payload.invoice_items = createInvoicePayload(originalInvoice.data.data.invoice_items, payload.invoice_items, false);
     // Enter new items
     payload.invoice_items = createInvoicePayload(invoiceModel.add_invoice.order_line, payload.invoice_items, true);
-
-    console.log("Creating test: ");
-
 
     return await axios.put(`${INApiUrl}invoices/${invoiceNumber}`, payload, axiosConfig);
 }

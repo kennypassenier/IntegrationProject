@@ -39,22 +39,28 @@ let standardUserToSendEventInfo = {
     municipal: "Anderlecht",
     vat: "123456789"
 }
-// Local token
-const INToken = "clzjfmtlwcmzjl3l328epk2hkezxj013";
-// VM token
-//const INToken = "xqi9nwol4tb8cilipgcvho8vl6b3cgha";
 const INApiUrl = "http://localhost/projects/ninja/public/api/v1/";
+// Info from local development machine vs VM where the app will be deployed
+const isRunningOnVM = true; // <----------------------- Change this value when deploying
+// Invoice Ninja API token
+const localINToken = "clzjfmtlwcmzjl3l328epk2hkezxj013";
+const VMINToken = "xqi9nwol4tb8cilipgcvho8vl6b3cgha";
+const INToken = isRunningOnVM ? VMINToken : localINToken;
+
 // IP address for Jochen's VM
-// Local IP
-const rabbitMQIP = "10.3.50.9";
-// IP from VM
-// const rabbitMPIP = "192.168.1.2";
+const localRabbitMQIP = "10.3.50.9";
+const VMRabbitMQIP = "192.168.1.2";
+const rabbitMQIP = isRunningOnVM ? VMRabbitMQIP : localRabbitMQIP;
+
 const axiosConfig = {
     headers: {
         "X-Ninja-Token": `${INToken}`
     }
 }
 let canSendWaitMessage = true;
+
+
+
 
 connect();
 function connect(){
@@ -87,10 +93,10 @@ function connect(){
 
 }
 function consume(channel, queue){
-    channel.get(queue, { noAck: false }, async function(err, msg) {
+    channel.get(queue, { noAck: true }, async function(err, msg) {
+        currentChannel = channel;
         if(msg){
             canSendWaitMessage = true;
-            currentChannel = channel;
             console.log("                                                  <--- Start of message --->");
             console.log(`Received message:  ${msg.content.toString()}`);
             try{
