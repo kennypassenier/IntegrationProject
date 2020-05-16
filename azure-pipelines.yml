@@ -11,8 +11,7 @@ pool: default
 steps:
 - powershell: |
     cd c:/IntegrationProject
-    git fetch
-    git checkout --force $BUILD_SOURCEVERSION
+    git pull origin master
   displayName: 'Updating Git repository'
 
 - powershell: |
@@ -22,7 +21,7 @@ steps:
   
 - powershell: |
     cd c:/IntegrationProject
-    node .\syncReceiver.js
+    #node .\syncReceiver.js
   displayName: 'Running application'
 
 
