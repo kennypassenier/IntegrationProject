@@ -9,10 +9,14 @@ trigger:
 pool: default
 
 steps:
+- powershell: 
+  cd c:/
+displayName: 'testing'
+
 - powershell: |
     cd c:/
-    git fetch
-    git checkout --force $BUILD_SOURCEVERSION
+    sudo git fetch
+    sudo git checkout --force $BUILD_SOURCEVERSION
   displayName: 'Updating Git repository'
 
 - powershell: |
