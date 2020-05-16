@@ -9,10 +9,14 @@ trigger:
 pool: default
 
 steps:
+- script: |
+    cd c:/nssm/win64
+    nssm stop IntegrationProjectService
+  displayName: 'Stopping integration service'
+
 - powershell: |
     cd c:/IntegrationProject
-    git fetch
-    git checkout --force $BUILD_SOURCEVERSION
+    git pull origin master
   displayName: 'Updating Git repository'
 
 - powershell: |
@@ -22,7 +26,10 @@ steps:
   
 - powershell: |
     cd c:/IntegrationProject
-    node .\syncReceiver.js
+    #node .\syncReceiver.js
   displayName: 'Running application'
 
-
+- script: |
+    cd c:/nssm/win64
+    nssm start IntegrationProjectService
+  displayName: 'Starting integration service'
