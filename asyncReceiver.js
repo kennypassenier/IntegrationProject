@@ -1,11 +1,9 @@
 "use strict"
 
-// Todo generate invoice ninja api key on VM and switch keys
-// Todo fill in mailtrap.io information and point to phantomjs
-// Todo change external ip to internal ip
-// Todo generate new IN token
-// Todo Insert heartbeat into this file
 
+// Wordt niet meer gebruikt, overgestapt naar syncReceiver.js
+
+/*
 
 // Imports
 const amqp = require('amqplib/callback_api');
@@ -87,8 +85,6 @@ amqp.connect(`amqp://${amqpUser}:${amqpPassword}@${rabbitMQIP}`, function(error0
         // Declare the queue you want to listen to
         let queue = "facturatie.queue";
 
-        // Todo test for synchronicity
-        // Todo make global variable to store message, so we can easily ack everything
         //channel.prefetch(1);
 
         console.log(`Waiting for messages in ${queue}. Exit with CTR+C`);
@@ -96,7 +92,6 @@ amqp.connect(`amqp://${amqpUser}:${amqpPassword}@${rabbitMQIP}`, function(error0
         channel.consume(queue, async function(msg) {
             currentChannel = channel;
             console.log(`Received message:  ${msg.content.toString()}`);
-            // Todo find a way to deal with ack, maybe make this global if everything is synchronously handled
             let allowRemoveFromQueue = false;
 
             try{
@@ -108,7 +103,6 @@ amqp.connect(`amqp://${amqpUser}:${amqpPassword}@${rabbitMQIP}`, function(error0
                 sendMessage(error.toString(), true);
             }
 
-            // Todo handle ack
             // If everything went well, acknowledge the message to remove it from the queue
             console.log(`Ready to Ack the message`);
             if(allowRemoveFromQueue){
@@ -116,8 +110,6 @@ amqp.connect(`amqp://${amqpUser}:${amqpPassword}@${rabbitMQIP}`, function(error0
                 //channel.ack(msg);
             }
 
-
-            // Todo remove noAck below if everything is working
         }, {
             noAck: false
         });
@@ -353,7 +345,6 @@ async function addInvoice(invoiceModel){
 
 // Handles the email_invoice case
 async function INSendInvoiceMail(uuid){
-    // todo magic numbers removal
     try{
         let appIdResponse = await getAppIdFromUuid(uuid);
         let appId = appIdResponse.data.facturatie;
@@ -492,11 +483,11 @@ async function INGetInvoice(invoiceId){
     return await axios.get(`${INApiUrl}invoices/${invoiceId}`, axiosConfig);
 }
 
-/*
+/!*
 async function INGetAllClientsAndInvoices(){
     return await axios.get(`${INApiUrl}clients?include=invoices`, axiosConfig);
 }
-*/
+*!/
 
 async function INGetAllInvoices(){
     return await axios.get(`${INApiUrl}invoices`, axiosConfig);
@@ -581,3 +572,4 @@ async function patchUserUUID(pUuid, applicationId){
         {"facturatie":`${applicationId}`}
     );
 }
+*/
