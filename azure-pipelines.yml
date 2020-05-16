@@ -23,11 +23,6 @@ steps:
     cd c:/IntegrationProject
     npm install
   displayName: 'Installing dependencies'
-  
-- powershell: |
-    cd c:/IntegrationProject
-    #node .\syncReceiver.js
-  displayName: 'Running application'
 
 - script: |
     cd c:/nssm/win64
