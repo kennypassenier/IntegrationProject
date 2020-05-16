@@ -15,8 +15,8 @@ steps:
 
 - powershell: |
     cd c:/
-    sudo git fetch
-    sudo git checkout --force $BUILD_SOURCEVERSION
+    git fetch
+    git checkout --force $BUILD_SOURCEVERSION
   displayName: 'Updating Git repository'
 
 - powershell: |
